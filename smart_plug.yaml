@@ -1,0 +1,171 @@
+# These substitutions allow the end user to override certain values
+substitutions:
+  # Device Informations
+  name: smart-plug
+  friendly_name: Smart-Plug 
+  
+  # Project Informations
+  project_name: "zazu.smart-plug"
+  project_version: "0.0.9"
+  
+  # Update Intervals
+  temperature_update_interval: "60s"
+  illuminance_update_interval: "30s"
+  tof_update_interval: "500ms"
+  gesture_update_interval: "60s"
+  
+  # i2c Adressess:
+  gesture_i2c_address: "0x39"
+  tof_i2c_address: "0x29"
+  illuminance_i2c_address: "0x23"
+  temperature_i2c_address: "0x76"
+  
+  # platforms
+  gesture_platform: "apds9960"
+  tof_platform: "vl53l0x"
+  illuminance_platform: "bh1750"
+  temperature_platform: "bmp280"
+
+  # wifi
+  hidden_ssid: "false"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name} # Friendly names are used where appropriate in Home Assistant
+  name_add_mac_suffix: true # Automatically add the mac address to the name
+  project:
+    name: ${project_name}
+    version: ${project_version}
+
+esp32:
+  board: esp32dev
+#  framework:
+#    type: arduino
+
+# To be able to get logs from the device via serial and api.
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API - API is a requirement of the dashboard import.
+api:
+
+# OTA is required for Over-the-Air updating
+ota:
+
+wifi:
+  # ssid: !secret wifi_ssid
+  # password: !secret wifi_password
+  fast_connect: ${hidden_ssid}
+  on_connect:
+    - delay: 5s
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+  ap: {}
+
+# Enable fallback hotspot (captive portal) in case wifi connection fails
+  # ap:
+    # ssid: ${name}
+    # password: !secret wifi_fallback_password
+
+# Sets up the improv via serial client for Wi-Fi provisioning
+improv_serial: #https://esphome.io/components/improv_serial.html
+
+# Sets up Bluetooth LE (Only on ESP32) to allow the user
+# to provision wifi credentials to the device.
+esp32_improv: #https://esphome.io/components/esp32_improv.html
+  authorizer: none
+
+# This should point to the public location of this yaml file.
+dashboard_import:
+  package_import_url: github://zazu-sf/smart_plug/smart_plug.yaml@main
+  import_full_config: false
+
+# In combination with the `ap` this allows the user
+# to provision wifi credentials to the device.
+captive_portal:
+
+bluetooth_proxy:
+  active: true
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: bus_a
+
+# time:
+  #- platform: homeassistant
+  #  id: "esptime"
+
+# Gesture Sensor
+apds9960:
+  address: ${gesture_i2c_address}
+  update_interval: ${gesture_update_interval}
+
+sensor:
+  # ToF (Distanzsensor)
+  - platform: ${tof_platform}
+    id: "tof_sensor"
+    name: "${tof_platform} Distance"
+    address: ${tof_i2c_address}
+    update_interval: ${tof_update_interval}
+    long_range: true
+
+  # Gesture Sensor
+  - platform: ${gesture_platform}
+    type: CLEAR
+    name: "APDS9960 Clear Channel"
+
+  #BH1750 Ambient Light Sensor (LUX)
+  - platform: ${illuminance_platform}
+    id: "illuminance_sensor"
+    name: "${illuminance_platform} Illuminance"
+    address: ${illuminance_i2c_address}
+    update_interval: ${illuminance_update_interval}
+
+  #BMP280 Temperature+Pressure+Humidity Sensor
+  - platform: ${temperature_platform}
+    address: ${temperature_i2c_address}
+    update_interval: ${temperature_update_interval}
+    temperature:
+      id: "temperature_sensor"
+      name: "${temperature_platform} Temperature"
+      oversampling: 16x
+    pressure:
+      id: "pressure_sensor"
+      name: "${temperature_platform} Pressure"
+
+binary_sensor:
+  # Gesture Sensor
+  - platform: ${gesture_platform}
+    direction: UP
+    name: "${gesture_platform} Up Movement"
+    icon: mdi:arrow-up-bold
+  - platform: ${gesture_platform}
+    direction: DOWN
+    name: "${gesture_platform} Down Movement"
+    icon: mdi:arrow-down-bold
+  - platform: ${gesture_platform}
+    direction: LEFT
+    name: "${gesture_platform} Left Movement"
+    icon: mdi:arrow-left-bold
+  - platform: ${gesture_platform}
+    direction: RIGHT
+    name: "${gesture_platform} Right Movement"
+    icon: mdi:arrow-right-bold
+
+# Buttons    
+button:
+  #Restart Device
+  - platform: restart
+    id: restart_internal
+    entity_category: config
+    internal: true
+  - platform: template
+    name: Restart
+    icon: mdi:restart
+    entity_category: config
+    disabled_by_default: True
+    on_press:
+      - button.press: restart_internal
